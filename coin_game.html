@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coin Mines Game</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        font-family: "Arial", sans-serif;
+        background-color: #101010; /* Dark background */
+        color: #ffffff; /* Light text color */
+      }
+      #controls {
+        text-align: center;
+        background-color: #1c1c1c; /* Panel background */
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
+        margin-bottom: 30px;
+      }
+      h1 {
+        font-size: 2.5em;
+        margin-bottom: 20px;
+        color: #ffd700; /* Gold color */
+      }
+      label {
+        font-size: 1.2em;
+        display: block;
+        margin-bottom: 10px;
+      }
+      input[type="number"] {
+        width: 100%;
+        padding: 12px;
+        font-size: 1.1em;
+        border: none;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        background-color: #333;
+        color: #fff;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(4, 90px);
+        grid-template-rows: repeat(4, 90px);
+        gap: 10px;
+      }
+      .cell {
+        background-color: #2c2c2c;
+        border-radius: 10px;
+        border: 2px solid #444;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+      .cell img {
+        width: 70%;
+        height: 70%;
+        visibility: hidden;
+      }
+      .cell.revealed img {
+        visibility: visible;
+      }
+      .flip {
+        transform: scale(1.1);
+      }
+      .coin img {
+        visibility: visible;
+      }
+      .bomb img {
+        visibility: visible;
+      }
+      #result {
+        margin-top: 20px;
+        font-size: 1.5em;
+        color: #fff;
+      }
+      button {
+        padding: 12px 20px;
+        background-color: #1e90ff;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+        width: 100%;
+      }
+      button:hover:not(:disabled) {
+        background-color: #00bfff;
+      }
+      button:disabled {
+        background-color: #a9a9a9;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <h1>Coin Mines Game</h1>
+      <label for="mines">Number of Mines (1-16):</label>
+      <input type="number" id="mines" value="4" min="1" max="16" />
+      <button id="startBtn">Start Game</button>
+      <div id="result"></div>
+    </div>
+
+    <div id="grid"></div>
+
+    <audio id="coinSound" src="coin-collect.mp3"></audio>
+    <audio id="bombSound" src="bomb-explode.mp3"></audio>
+
+    <script>
+      const grid = document.getElementById("grid");
+      const resultDisplay = document.getElementById("result");
+      const minesInput = document.getElementById("mines");
+      const startBtn = document.getElementById("startBtn");
+      const rows = 4;
+      const cols = 4;
+      let totalBombs = 4;
+      let gameActive = false;
+      let cells = [];
+      let revealedCells = 0; // Track revealed cells to detect win
+
+      const coinSound = document.getElementById("coinSound");
+      const bombSound = document.getElementById("bombSound");
+      // Set lower volume for both sounds
+      coinSound.volume = 0.05; // 30% volume
+      bombSound.volume = 0.05; // 30% volume
+      function initGame() {
+        cells = Array(rows)
+          .fill()
+          .map(() => Array(cols).fill(null));
+        resultDisplay.textContent = "";
+        revealedCells = 0;
+
+        let bombsPlaced = 0;
+        while (bombsPlaced < totalBombs) {
+          const row = Math.floor(Math.random() * rows);
+          const col = Math.floor(Math.random() * cols);
+          if (cells[row][col] === null) {
+            cells[row][col] = "bomb";
+            bombsPlaced++;
+          }
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (cells[r][c] === null) {
+              cells[r][c] = "coin";
+            }
+          }
+        }
+
+        renderGrid();
+        gameActive = true;
+        startBtn.disabled = true;
+      }
+
+      function renderGrid() {
+        grid.innerHTML = "";
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+
+            const img = document.createElement("img");
+            if (cells[r][c] === "coin") {
+              img.src = "https://pngimg.com/d/coin_PNG36871.png"; // Replace with actual coin image path
+            } else {
+              img.src =
+                "https://cdn-icons-png.flaticon.com/512/8623/8623662.png"; // Replace with actual bomb image path
+            }
+            cell.appendChild(img);
+
+            cell.addEventListener("click", revealCell);
+            grid.appendChild(cell);
+          }
+        }
+      }
+
+      function revealCell() {
+        if (!gameActive) return;
+        const row = this.dataset.row;
+        const col = this.dataset.col;
+        this.classList.add("flip"); // Add flip animation
+        this.classList.add("revealed"); // Make images visible
+
+        const img = this.querySelector("img");
+        img.style.visibility = "visible"; // Show image
+
+        if (cells[row][col] === "bomb") {
+          bombSound.play();
+          this.classList.add("bomb");
+          resultDisplay.textContent = "Game Over! You hit a bomb!";
+          gameActive = false;
+          startBtn.disabled = false;
+          revealAllCells();
+        } else if (cells[row][col] === "coin") {
+          coinSound.play();
+          this.classList.add("coin");
+          revealedCells++;
+
+          // Check win condition
+          if (revealedCells === rows * cols - totalBombs) {
+            resultDisplay.textContent =
+              "Congratulations! You found all the coins!";
+            gameActive = false;
+            startBtn.disabled = false;
+          }
+        }
+      }
+
+      function revealAllCells() {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = grid.children[r * cols + c];
+            const img = cell.querySelector("img");
+            img.style.visibility = "visible"; // Show image
+            if (cells[r][c] === "bomb") {
+              cell.classList.add("bomb");
+            } else {
+              cell.classList.add("coin");
+            }
+          }
+        }
+      }
+
+      startBtn.addEventListener("click", () => {
+        totalBombs = parseInt(minesInput.value);
+        if (totalBombs < 1 || totalBombs > 16) {
+          alert("Please enter a number between 1 and 16 for mines.");
+          return;
+        }
+        initGame();
+      });
+    </script>
+  </body>
+</html>
